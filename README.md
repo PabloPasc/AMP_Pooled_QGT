@@ -5,4 +5,4 @@ All plots are generated using Python files.
 
 
 # Required Packages
-In order to run the files, the following Python libraries are required: _numpy_ and _matplotlib_. In addition, library _tikzpltlib_ can be used to generate tikz files corresponding to each of the plots.
+In order to run the files, the following Python libraries are required: _numpy_, _scipy_ and _matplotlib_. In addition, library _tikzpltlib_ can be used to generate tikz files corresponding to each of the plots.
