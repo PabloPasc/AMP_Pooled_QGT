@@ -138,6 +138,7 @@ def X_iid_to_X_tilde(X_iid, alpha):
 def Y_iid_to_Y_iid_tilde(Y, alpha, m, n, pi_true='None'):
     if pi_true == 'None':
         #Estimate no. defective items - doesn't work well
+        #Y_tilde = (1/np.sqrt(m*alpha*(1-alpha)))*(Y - alpha*n*pi)
         print("True pi not known")
     else:
         Y_tilde = (1/np.sqrt(m*alpha*(1-alpha)))*(Y - alpha*n*pi_true)
