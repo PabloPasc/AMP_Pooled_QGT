@@ -118,30 +118,6 @@ def create_X_iid(alpha, m, n):
     X = np.random.binomial(1, alpha, (m, n))
     return X
 
-'''=== spatially coupled design matrix ==='''
-def create_base_matrix(lam, omega, alpha):
-  R = lam + omega - 1
-  C = lam
-  W = np.zeros((R, C))
-  for c in range(C):
-      for r in range(c, c + omega):
-        if alpha >= 0.5:
-          W[r, c] = (1 + np.sqrt(1-4*alpha*(1-alpha)/omega)) / (2*alpha)
-        elif alpha < 0.5:
-          W[r, c] = (1 - np.sqrt(1-4*alpha*(1-alpha)/omega)) / (2*alpha)
-  return W
-
-def create_SC_matrix(W, N, alpha, delin):
-  R, C = np.shape(W)
-  M = int(delin*N)
-  m, n = M*R, N*C
-  print(m,n)
-  X_sc = np.zeros((m,n))
-  for c in range(C):
-      for r in range(R):
-          X_sc[M*r:(M*r+M), N*c:(N*c + N )] = np.random.binomial(1, alpha * W[r,c], (M, N))
-  return X_sc
-
 '''=== Create signal matrix B with probabilities vector pi ==='''
 def create_B(pi, n):
     assert np.sum(pi)==1
@@ -158,19 +134,6 @@ def X_iid_to_X_tilde(X_iid, alpha):
     X_tilde = (1/np.sqrt(m*alpha*(1-alpha)))*(X_iid - alpha)
     return X_tilde
 
-
-def Xsc_to_Xsctilde(X_sc, W, alpha):
-    m, n = np.shape(X_sc)
-    R, C = np.shape(W)
-    M, N = int(m/R), int(n/C)
-    lam = C
-    omega = R + 1 - lam
-    X_sc_tilde = np.zeros((m,n))
-    for c in range(C):
-        for r in range(c, c + omega):
-            X_sc_tilde[M*r:(M*r+M), N*c:(N*c + N )] = (1/np.sqrt(m*alpha*(1-alpha)/R))*(X_sc[M*r:(M*r+M), N*c:(N*c + N )] - alpha*W[r,c])
-    return X_sc_tilde        
-
 '''=== Transform measurements matrix for AMP ==='''            
 def Y_iid_to_Y_iid_tilde(Y, alpha, m, n, pi_true='None'):
     if pi_true == 'None':
@@ -184,26 +147,6 @@ def Y_iid_to_Y_iid_tilde(Y, alpha, m, n, pi_true='None'):
 def Psi_to_Psi_tilde(Psi, alpha, m):
     Psi_tilde = (1/np.sqrt(m*alpha*(1-alpha)))*Psi
     return Psi_tilde
-
-def y_sc_to_y_sc_tilde(y, alpha, W, nu, omega, m, n, defect_no='None'):
-    """defect_no here is a length-C array where the cth element corresponds
-    to the number of defective items in the cth column-block of beta_0"""
-    R, C = np.shape(W)
-    N = n/C
-    M = m/R
-    if defect_no == 'None':
-        #Estimate no. defective items - doesn't work well
-        y_tilde = (1/np.sqrt(m*alpha*(1-alpha)/R))*(y - alpha*W[0,0]*omega*N*nu)
-    else:
-        y_tilde = np.zeros(m)
-        for r in range(R):
-            y_tilde[r*M:(r+1)*M] = (1/np.sqrt(m*alpha*(1-alpha)/R))*(y[r*M:(r+1)*M] - alpha*np.sum(W[r,:]*defect_no))
-    return y_tilde
-
-def W_to_Wtilde(W, alpha):
-    W_tilde = (W*(1-alpha*W))/(1-alpha)
-    return W_tilde
-
 
 def eta_pool(S, T_B, pi, calcJac=False):
     """
@@ -331,7 +274,6 @@ def se_pool(delta, L, alpha, pi, sigma, iter_max, num_mc_samples):
     return MSE_mat_arr, eff_noise_cov_arr, mse_est_array, correlation_arr
 
 
-
 def amp_pool(pi, A, Y, max_iter, X0):
     """
     AMP recursion to update the estimate X and the residual Z.
@@ -419,39 +361,6 @@ def one_hot_vec(index, length):
   output[index] = 1
   return output
 
-"""def category_check(matrix, estimate, sparsity_lvls):
-  p = len(estimate)
-  L = len(estimate[0])
-  output = matrix
-  for l in range(L):
-    l_num_items = sparsity_lvls[l]*p
-    if np.sum(estimate[:,l]) == l_num_items:
-      output[:,l] = np.full(p,matrix.min())
-  return output
-
-def estimate(input, sparsity_lvls):
-  p = len(input)
-  L = len(input[0])
-  output = np.zeros((p,L))
-  matrix = input
-  for iter in range(p):
-    item, category = np.unravel_index(np.argmax(matrix, axis=None), matrix.shape)
-    output[item,:] = one_hot_vec(category, L)
-    matrix[item,:] = np.full(L,input.min())
-    matrix = category_check(matrix,output,sparsity_lvls)
-  return output
-
-# The greedy version
-def IHT_greedy(Y, X, p, sparsity_lvls, num_iter):
-  L = len(sparsity_lvls)
-  B_k = np.zeros((p, L))
-  for k in range(num_iter):
-    input = B_k + np.dot(X.T,Y-np.dot(X,B_k))
-    B_k = estimate(input, sparsity_lvls)
-  return B_k
-"""
-
-
 def category_check(matrix, estimate, sparsity_lvls, category, min_value):
   p = len(estimate)
   outpu2 = np.copy(matrix)
@@ -497,163 +406,3 @@ def IHT_greedy(Y, X, p, sparsity_lvls, num_iter, B_0):
     correl = np.mean(np.einsum('ij, ij->i', B_k, B_0))
     corr_array.append(correl)
   return B_k, corr_array
-
-"""
-#Tests - IHT
-p = 500
-alpha = 0.5
-delta = 0.2
-n = int(delta*p)
-sigma= 0.1
-pi = np.array([1/3, 1/3, 1/3])
-L = len(pi)
-run_no = 1
-delta_corr_runs_iht = []
-
-for run in range(run_no):
-    B_0 = create_B(pi, p)
-    
-    
-    X = np.random.binomial(1, alpha, (n,p))
-    Psi = np.random.normal(0, np.sqrt(p)*sigma, (n,L))
-    Y = np.dot(X, B_0) + Psi
-    sparsity_lvls = np.einsum('i,ij->j', np.ones(p), B_0)
-    pi_true = (1/p)*sparsity_lvls
-    
-    X_tilde = X_iid_to_X_tilde(X, alpha)
-    Y_tilde = Y_iid_to_Y_iid_tilde(Y, alpha, n, p, pi_true)
-
-    
-    # IHT
-    sparsity_lvls = (pi_true*p).round().astype(int)
-    B_hat, corr_array1 = IHT_greedy(Y_tilde, X_tilde, p, sparsity_lvls, num_iter=100)
-    corr_av_iht = np.mean(np.einsum('ij, ij->i', B_hat, B_0))
-    delta_corr_runs_iht.append(corr_av_iht)
-
-plt.figure()
-plt.xlabel("Iteration")
-plt.ylabel('Correlation')
-plt.plot(corr_array1[:100])
-"""
-"""
-#Simulations
-alpha = 0.5
-run_no = 10
-sigma = 0.3
-n = 500
-max_iter = 200
-num_mc_samples = 1000000
-pi = np.array([1/3, 1/3, 1/3])
-L = len(pi)
-delta_array = np.linspace(0.2, 1, num=9)
-delta_se_array = np.linspace(0.2, 1, 41)
-delta_array_zoom = [0.35, 0.375, 0.4, 0.425, 0.45]
-
-delta_se_mse = []
-delta_se_corr = []
-delta_mse = []
-delta_corr = []
-delta_corr_std = []
-delta_mse_b = []
-delta_corr_b = []
-delta_corr_b_std = []
-delta_corr_b_nopi = []
-delta_corr_b_std_nopi = []
-delta_corr_lp = []
-delta_corr_lp_std = []
-delta_corr_lp_pihat = []
-delta_corr_lp_std_pihat = []
-
-for delta in delta_se_array:
-    print("delta: ", delta)
-    m = int(delta*n)
-    _, _, mse_est_array, corr_array = se_fn(delta, L, alpha, pi, sigma, max_iter, num_mc_samples)
-    delta_se_mse.append(mse_est_array[-1])
-    delta_se_corr.append(corr_array[-1])
-
-for delta in delta_array:
-    print("delta: ", delta)
-    m = int(delta*n)
-    
-    #delta_corr_runs = []
-    #delta_corr_b_runs = []
-    #delta_corr_b_runs_nopi = []
-    delta_corr_runs_lp = []
-    delta_corr_runs_lp_pihat = []
-    
-    for run in range(run_no):
-        
-        B_0 = create_B(pi, n)
-        
-        print("Run: ", run)
-        #AMP - on Bernoulli matrix
-        X = np.random.binomial(1, alpha, (m,n))
-        Psi = np.random.normal(0, np.sqrt(n)*sigma, (m,L))
-        Y = np.dot(X, B_0) + Psi
-        pi_true = (1/n)*np.einsum('i,ij->j', np.ones(n), B_0)
-        
-        X_tilde = Xiid_to_Xtilde(X, alpha)
-        Y_tilde = Y_iid_to_Y_iid_tilde(Y, alpha, m, n, pi_true)
-        B, _, mse_arr, noise_arr, mse_final_b = amp_pool(pi, X_tilde, Y_tilde, max_iter, B_0)
-        corr_av_b = np.mean(np.einsum('ij, ij->i', B, B_0))
-        print(mse_final_b)
-        #delta_mse_b.append(mse_final_b)
-        delta_corr_b_runs.append(corr_av_b)
-        
-        #AMP - on Bernoulli matrix without pi_true
-        Y_tilde = Y_iid_to_Y_iid_tilde(Y, alpha, m, n, pi)
-        B, _, mse_arr, noise_arr, mse_final_b = amp_pool(pi, X_tilde, Y_tilde, max_iter, B_0)
-        corr_av_b_nopi = np.mean(np.einsum('ij, ij->i', B, B_0))
-        print(mse_final_b)
-        #delta_mse_b.append(mse_final_b)
-        delta_corr_b_runs_nopi.append(corr_av_b_nopi)
-        
-        #AMP - on iid Gaussian matrix
-        X_tilde = np.random.randn(m, n) / np.sqrt(m)
-        Y_tilde = np.dot(X_tilde, B_0) + np.random.normal(0, np.sqrt(n/(m*alpha*(1-alpha)))*sigma, (m,L))
-        B, _, mse_arr, noise_arr, mse_final = amp_pool(pi, X_tilde, Y_tilde, max_iter, B_0)
-        corr_av = np.mean(np.einsum('ij, ij->i', B, B_0))
-        print(mse_final)
-        delta_mse.append(mse_final)
-        delta_corr_runs.append(corr_av)
-        
-        #NP - with pi_hat
-        #B_LP_est = run_LP(m, n, L, Y, X, pi_true) #only for Sigma = 0
-        B_LP_est = run_NP(m, n, L, Y, X, sigma, pi_true)
-        corr_av_lp_pihat = np.mean(np.einsum('ij, ij->i', B_LP_est, B_0))
-        delta_corr_runs_lp_pihat.append(corr_av_lp_pihat)
-        
-        #NP - with pi
-        #B_LP_est = run_LP(m, n, L, Y, X, pi_true) #only for Sigma = 0
-        B_LP_est = run_NP(m, n, L, Y, X, sigma, pi)
-        corr_av_lp = np.mean(np.einsum('ij, ij->i', B_LP_est, B_0))
-        delta_corr_runs_lp.append(corr_av_lp)"""
-        
-    
-"""    delta_corr.append(np.mean(delta_corr_runs))
-    delta_corr_std.append(np.std(delta_corr_runs))
-    delta_corr_b.append(np.mean(delta_corr_b_runs))
-    delta_corr_b_std.append(np.std(delta_corr_b_runs))
-    delta_corr_b_nopi.append(np.mean(delta_corr_b_runs_nopi))
-    delta_corr_b_std_nopi.append(np.std(delta_corr_b_runs_nopi))
-    delta_corr_lp.append(np.mean(delta_corr_runs_lp))
-    delta_corr_lp_std.append(np.std(delta_corr_runs_lp))
-    delta_corr_lp_pihat.append(np.mean(delta_corr_runs_lp_pihat))
-    delta_corr_lp_std_pihat.append(np.std(delta_corr_runs_lp_pihat))
-        
-plt.figure()
-plt.plot(delta_se_array, delta_se_corr, label='SE,iid Gaussian', color = 'red')
-plt.errorbar(delta_array, delta_corr[:], yerr=delta_corr_std[:], label ="AMP, iid Gaussian", fmt='o', color='darkorange',ecolor='moccasin', elinewidth=3, capsize=0)
-plt.errorbar(delta_array, delta_corr_b[:], yerr=delta_corr_b_std[:], label =r"AMP, Bernoulli with $\hat{\pi}$", fmt='*', color='blue',ecolor='lightblue', elinewidth=3, capsize=0)
-plt.errorbar(delta_array, delta_corr_b_nopi[:], yerr=delta_corr_b_std_nopi[:], label =r"AMP, Bernoulli with $\pi$", fmt='*', color='black',ecolor='lightgrey', elinewidth=3, capsize=0)
-plt.errorbar(delta_array, delta_corr_lp[:], yerr=delta_corr_lp_std[:], label =r"CVX, $\pi$", fmt='x', color='green',ecolor='lightgreen', elinewidth=3, capsize=0)
-plt.errorbar(delta_array, delta_corr_lp_pihat[:], yerr=delta_corr_lp_std_pihat[:], label =r"CVX, $\hat{\pi}$", fmt='x', color='brown',ecolor='peru', elinewidth=3, capsize=0)
-#plt.plot(delta_array, mse_array, label='iid AMP', marker='x',linestyle='dashed',color='blue')
-#plt.plot(delta_array, se_nc_array, label='AMP, Bernoulli Gaussian', marker='x',linestyle='dashed', color='red')
-#plt.plot(delta_array, sc_mse_array, label='SC AMP', marker='x',linestyle='dashed', color='orange')
-#plt.plot(delta_array, sc_se_mse_array, label='SC SE', color='orange')
-plt.grid(alpha=0.4)
-plt.legend()
-plt.ylabel('Correlation')
-plt.xlabel(r'$\delta=n/p$')"""
-#tikzplotlib.save("pool_fig2b_10runs_p500_NPcomp.tex")"""
