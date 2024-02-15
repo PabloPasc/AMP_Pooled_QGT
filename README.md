@@ -5,7 +5,7 @@ All plots are generated using Python files.
 
 
 # Required Packages
-In order to run the files, the following Python libraries are required: _numpy_, _scipy_, _numba_, _cvxpy_ and _matplotlib_. In addition, library _tikzplotlib_ can be used to generate tikz files corresponding to each of the plots.
+In order to run the files, the following Python libraries are required: _numpy_, _scipy_, _math_, _numba_, _cvxpy_ and _matplotlib_. In addition, library _tikzplotlib_ can be used to generate tikz files corresponding to each of the plots.
 
 # Python Scripts
 ## pool_amp.py
